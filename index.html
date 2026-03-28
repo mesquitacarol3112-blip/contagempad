@@ -1,113 +1,128 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <title>Controle de Empadões</title>
-  <style>
-    body {font-family: Arial; background: linear-gradient(135deg,#4b0082,#8a2be2); color:#fff; text-align:center; padding:20px;}
+<meta charset="UTF-8">
+<title>Controle de Empadões</title>
 
-    h1 {margin-bottom:20px;}
+<style>
+body {
+  font-family: Arial;
+  background: linear-gradient(135deg,#4b0082,#8a2be2);
+  color:#fff;
+  text-align:center;
+  padding:20px;
+}
 
-    .top-buttons {margin-bottom:20px;}
+.top-buttons {margin-bottom:20px;}
 
-    .gaveta {max-width:1100px; margin:auto; text-align:left;}
+.gaveta {max-width:1100px; margin:auto; text-align:left;}
 
-    .semana {background:rgba(255,255,255,0.1); margin:10px 0; border-radius:12px; overflow:hidden;}
+.semana {
+  background:rgba(255,255,255,0.1);
+  margin:10px 0;
+  border-radius:12px;
+  overflow:hidden;
+}
 
-    .titulo {
-      padding:15px;
-      cursor:pointer;
-      font-weight:bold;
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      background:rgba(0,0,0,0.25);
-    }
+.titulo {
+  padding:15px;
+  cursor:pointer;
+  font-weight:bold;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:rgba(0,0,0,0.25);
+}
 
-    .conteudo {display:none; padding:15px;}
+.conteudo {display:none; padding:15px;}
 
-    .container {
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-      gap:10px;
-    }
+.container {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:10px;
+}
 
-    .card {
-      background:rgba(255,255,255,0.15);
-      padding:10px;
-      border-radius:10px;
-      text-align:center;
-    }
+.card {
+  background:rgba(255,255,255,0.15);
+  padding:10px;
+  border-radius:10px;
+  text-align:center;
+}
 
-    input {
-      margin:3px;
-      padding:5px;
-      border-radius:5px;
-      border:none;
-      text-align:center;
-      width:80%;
-    }
+input {
+  margin:3px;
+  padding:5px;
+  border-radius:5px;
+  border:none;
+  text-align:center;
+  width:80%;
+}
 
-    button {
-      margin:5px;
-      padding:8px 12px;
-      border:none;
-      border-radius:8px;
-      cursor:pointer;
-      font-weight:bold;
-    }
+button {
+  margin:5px;
+  padding:8px 12px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:bold;
+}
 
-    .danger {background:#ff4d4d; color:#fff;}
+.danger {background:#ff4d4d; color:#fff;}
 
-    table {margin:20px auto; background:#fff; color:#000; border-radius:8px; overflow:hidden;}
-    th,td {padding:10px;}
-  </style>
+</style>
 </head>
+
 <body>
 
 <h1>Controle de Empadões</h1>
 
 <div class="top-buttons">
   <button onclick="novaSemana()">+ Nova Semana</button>
-  <button onclick="salvarFirebase()">Salvar Tudo</button>
+  <button onclick="salvar()">Salvar</button>
 </div>
 
-<div class="gaveta" id="gaveta"></div>
-
-<div id="relatorio"></div>
+<div id="gaveta" class="gaveta"></div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+// 🔥 SEU FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyBWqOEuOoucdlGi-J8OkJbNQlb2--YW6XU",
   authDomain: "contagempad.firebaseapp.com",
   projectId: "contagempad",
   storageBucket: "contagempad.firebasestorage.app",
   messagingSenderId: "414035527250",
-  appId: "1:414035527250:web:9694668e3ad95e745fc18b"
+  appId: "1:414035527250:web:9694668e3ad95e745fc18b",
+  databaseURL: "https://contagempad-default-rtdb.firebaseio.com/"
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db = getDatabase(app);
 
 let semanas = {};
+let aberto = {};
+
 const gaveta = document.getElementById("gaveta");
 
 async function carregar(){
-  const snap = await getDoc(doc(db,"empadoes","dados"));
+  try{
+    const snapshot = await get(child(ref(db), "empadoes"));
 
-  if(snap.exists() && snap.data().semanas){
-    semanas = snap.data().semanas;
-  } else {
-    semanas = {"Semana 1":[]};
+    if(snapshot.exists()){
+      semanas = snapshot.val();
+    } else {
+      semanas = {"Semana 1":[]};
+    }
+
+    render();
+  }catch(e){
+    console.error(e);
+    alert("Erro ao carregar");
   }
-
-  render();
 }
-
-let aberto = {};
 
 function render(){
   gaveta.innerHTML="";
@@ -120,59 +135,52 @@ function render(){
     const titulo = document.createElement("div");
     titulo.className="titulo";
 
-    const nomeSpan = document.createElement("span");
-    nomeSpan.innerText = semana;
-
-    const btnDeleteSemana = document.createElement("button");
-    btnDeleteSemana.innerText = "Excluir Semana";
-    btnDeleteSemana.className = "danger";
-    btnDeleteSemana.onclick = (e)=>{
-      e.stopPropagation();
-      deletarSemana(semana);
-    };
-
-    titulo.appendChild(nomeSpan);
-    titulo.appendChild(btnDeleteSemana);
+    titulo.innerHTML = `
+      <span>${semana}</span>
+      <button class="danger">Excluir Semana</button>
+    `;
 
     const conteudo = document.createElement("div");
-    conteudo.style.display = aberto[semana] ? "block" : "none";
     conteudo.className="conteudo";
+    conteudo.style.display = aberto[semana] ? "block" : "none";
 
     titulo.onclick = ()=>{
       aberto[semana] = !aberto[semana];
       conteudo.style.display = aberto[semana] ? "block" : "none";
     };
 
+    titulo.querySelector("button").onclick = (e)=>{
+      e.stopPropagation();
+      delete semanas[semana];
+      render();
+    };
+
     const container = document.createElement("div");
     container.className="container";
 
     semanas[semana].forEach((item,i)=>{
+
       const card = document.createElement("div");
       card.className="card";
 
       card.innerHTML = `
-        <input placeholder="Nome" value="${item.nome || ''}" onchange="editar('${semana}',${i},'nome',this.value)"><br>
-        P: <input type="number" value="${item.precoP || 0}" onchange="editar('${semana}',${i},'precoP',this.value)"><br>
-        G: <input type="number" value="${item.precoG || 0}" onchange="editar('${semana}',${i},'precoG',this.value)"><br>
-        QP: <input type="number" value="${item.qtdP || 0}" onchange="editar('${semana}',${i},'qtdP',this.value)"><br>
-        QG: <input type="number" value="${item.qtdG || 0}" onchange="editar('${semana}',${i},'qtdG',this.value)"><br>
-        <button class="danger" onclick="remover('${semana}',${i})">Excluir</button>
+        <input placeholder="Nome" value="${item.nome || ''}" onchange="editar('${semana}',${i},'nome',this.value)">
+        <br>P: <input type="number" value="${item.precoP || 0}" onchange="editar('${semana}',${i},'precoP',this.value)">
+        <br>G: <input type="number" value="${item.precoG || 0}" onchange="editar('${semana}',${i},'precoG',this.value)">
+        <br>QP: <input type="number" value="${item.qtdP || 0}" onchange="editar('${semana}',${i},'qtdP',this.value)">
+        <br>QG: <input type="number" value="${item.qtdG || 0}" onchange="editar('${semana}',${i},'qtdG',this.value)">
+        <br><button class="danger" onclick="remover('${semana}',${i})">Excluir</button>
       `;
 
       container.appendChild(card);
     });
 
     const btnAdd = document.createElement("button");
-    btnAdd.innerText = "+ Sabor";
-    btnAdd.onclick = ()=>addSabor(semana);
-
-    const btnRel = document.createElement("button");
-    btnRel.innerText = "Relatório";
-    btnRel.onclick = ()=>gerarRelatorio(semana);
+    btnAdd.innerText="+ Sabor";
+    btnAdd.onclick=()=>addSabor(semana);
 
     conteudo.appendChild(container);
     conteudo.appendChild(btnAdd);
-    conteudo.appendChild(btnRel);
 
     box.appendChild(titulo);
     box.appendChild(conteudo);
@@ -184,52 +192,38 @@ function render(){
 window.editar=(semana,i,campo,valor)=>{
   const item = semanas[semana][i];
   item[campo]= campo==='nome'?valor:parseFloat(valor)||0;
-}
+};
 
 window.addSabor=(semana)=>{
   semanas[semana].push({nome:"",precoP:0,precoG:0,qtdP:0,qtdG:0});
+  aberto[semana]=true;
   render();
-}
+};
 
 window.remover=(semana,i)=>{
   semanas[semana].splice(i,1);
   render();
-}
-
-window.deletarSemana=(semana)=>{
-  delete semanas[semana];
-  if(Object.keys(semanas).length === 0){
-    semanas = {"Semana 1":[]};
-  }
-  render();
-}
+};
 
 window.novaSemana=()=>{
   const nome = "Semana " + (Object.keys(semanas).length+1);
   semanas[nome]=[];
+  aberto[nome]=true;
   render();
-}
+};
 
-window.salvarFirebase=async()=>{
-  await setDoc(doc(db,"empadoes","dados"),{semanas});
-  alert("Salvo!");
-}
-
-window.gerarRelatorio=(semana)=>{
-  let html=`<h2>${semana}</h2><table border='1'><tr><th>Sabor</th><th>P</th><th>G</th><th>Total</th></tr>`;
-
-  semanas[semana].forEach(item=>{
-    const total=(item.qtdP*item.precoP)+(item.qtdG*item.precoG);
-    if(total>0){
-      html+=`<tr><td>${item.nome}</td><td>${item.qtdP}</td><td>${item.qtdG}</td><td>${total.toFixed(2)}</td></tr>`;
-    }
-  });
-
-  html+="</table>";
-  document.getElementById("relatorio").innerHTML=html;
-}
+window.salvar=async()=>{
+  try{
+    await set(ref(db,"empadoes"),semanas);
+    alert("Salvo com sucesso!");
+  }catch(e){
+    console.error(e);
+    alert("Erro ao salvar!");
+  }
+};
 
 carregar();
+
 </script>
 
 </body>
