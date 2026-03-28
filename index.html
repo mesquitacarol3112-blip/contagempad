@@ -107,6 +107,8 @@ async function carregar(){
   render();
 }
 
+let aberto = {};
+
 function render(){
   gaveta.innerHTML="";
 
@@ -133,10 +135,12 @@ function render(){
     titulo.appendChild(btnDeleteSemana);
 
     const conteudo = document.createElement("div");
+    conteudo.style.display = aberto[semana] ? "block" : "none";
     conteudo.className="conteudo";
 
     titulo.onclick = ()=>{
-      conteudo.style.display = conteudo.style.display === "block" ? "none" : "block";
+      aberto[semana] = !aberto[semana];
+      conteudo.style.display = aberto[semana] ? "block" : "none";
     };
 
     const container = document.createElement("div");
