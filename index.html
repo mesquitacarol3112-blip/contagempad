@@ -21,7 +21,6 @@ body {
   background:rgba(255,255,255,0.1);
   margin:10px 0;
   border-radius:12px;
-  overflow:hidden;
 }
 
 .titulo {
@@ -69,6 +68,13 @@ button {
 
 .danger {background:#ff4d4d; color:#fff;}
 
+.relatorio {
+  background:#fff;
+  color:#000;
+  padding:15px;
+  border-radius:10px;
+  margin-top:20px;
+}
 </style>
 </head>
 
@@ -83,12 +89,13 @@ button {
 
 <div id="gaveta" class="gaveta"></div>
 
+<div id="relatorio"></div>
+
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-// 🔥 SEU FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyBWqOEuOoucdlGi-J8OkJbNQlb2--YW6XU",
   authDomain: "contagempad.firebaseapp.com",
@@ -108,26 +115,27 @@ let aberto = {};
 const gaveta = document.getElementById("gaveta");
 
 async function carregar(){
-  try{
-    const snapshot = await get(child(ref(db), "empadoes"));
+  const snapshot = await get(child(ref(db), "empadoes"));
 
-    if(snapshot.exists()){
-      semanas = snapshot.val();
-    } else {
-      semanas = {"Semana 1":[]};
-    }
-
-    render();
-  }catch(e){
-    console.error(e);
-    alert("Erro ao carregar");
+  if(snapshot.exists()){
+    semanas = snapshot.val();
+  } else {
+    semanas = {"Semana 1":[]};
   }
+
+  render();
 }
 
 function render(){
   gaveta.innerHTML="";
 
   Object.keys(semanas).forEach((semana)=>{
+
+    let totalSemana = 0;
+
+    semanas[semana].forEach(item=>{
+      totalSemana += (item.qtdP*item.precoP) + (item.qtdG*item.precoG);
+    });
 
     const box = document.createElement("div");
     box.className="semana";
@@ -136,7 +144,7 @@ function render(){
     titulo.className="titulo";
 
     titulo.innerHTML = `
-      <span>${semana}</span>
+      <span>${semana} — 💰 R$ ${totalSemana.toFixed(2)}</span>
       <button class="danger">Excluir Semana</button>
     `;
 
@@ -160,15 +168,22 @@ function render(){
 
     semanas[semana].forEach((item,i)=>{
 
+      const total = (item.qtdP*item.precoP)+(item.qtdG*item.precoG);
+
       const card = document.createElement("div");
       card.className="card";
 
       card.innerHTML = `
         <input placeholder="Nome" value="${item.nome || ''}" onchange="editar('${semana}',${i},'nome',this.value)">
+        
         <br>P: <input type="number" value="${item.precoP || 0}" onchange="editar('${semana}',${i},'precoP',this.value)">
         <br>G: <input type="number" value="${item.precoG || 0}" onchange="editar('${semana}',${i},'precoG',this.value)">
+        
         <br>QP: <input type="number" value="${item.qtdP || 0}" onchange="editar('${semana}',${i},'qtdP',this.value)">
         <br>QG: <input type="number" value="${item.qtdG || 0}" onchange="editar('${semana}',${i},'qtdG',this.value)">
+        
+        <br><b>Total: R$ ${total.toFixed(2)}</b>
+        
         <br><button class="danger" onclick="remover('${semana}',${i})">Excluir</button>
       `;
 
@@ -179,8 +194,13 @@ function render(){
     btnAdd.innerText="+ Sabor";
     btnAdd.onclick=()=>addSabor(semana);
 
+    const btnRel = document.createElement("button");
+    btnRel.innerText="Relatório";
+    btnRel.onclick=()=>gerarRelatorio(semana);
+
     conteudo.appendChild(container);
     conteudo.appendChild(btnAdd);
+    conteudo.appendChild(btnRel);
 
     box.appendChild(titulo);
     box.appendChild(conteudo);
@@ -192,6 +212,7 @@ function render(){
 window.editar=(semana,i,campo,valor)=>{
   const item = semanas[semana][i];
   item[campo]= campo==='nome'?valor:parseFloat(valor)||0;
+  render();
 };
 
 window.addSabor=(semana)=>{
@@ -217,9 +238,34 @@ window.salvar=async()=>{
     await set(ref(db,"empadoes"),semanas);
     alert("Salvo com sucesso!");
   }catch(e){
-    console.error(e);
     alert("Erro ao salvar!");
   }
+};
+
+window.gerarRelatorio=(semana)=>{
+  let html = `<div class="relatorio"><h2>${semana}</h2><table border="1"><tr><th>Sabor</th><th>P</th><th>G</th><th>Total</th></tr>`;
+
+  let totalGeral = 0;
+
+  semanas[semana].forEach(item=>{
+    const total=(item.qtdP*item.precoP)+(item.qtdG*item.precoG);
+
+    if(total>0){
+      totalGeral += total;
+
+      html += `<tr>
+        <td>${item.nome}</td>
+        <td>${item.qtdP}</td>
+        <td>${item.qtdG}</td>
+        <td>R$ ${total.toFixed(2)}</td>
+      </tr>`;
+    }
+  });
+
+  html += `<tr><td colspan="3"><b>Total Geral</b></td><td><b>R$ ${totalGeral.toFixed(2)}</b></td></tr>`;
+  html += `</table></div>`;
+
+  document.getElementById("relatorio").innerHTML = html;
 };
 
 carregar();
