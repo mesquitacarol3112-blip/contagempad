@@ -5,25 +5,24 @@
   <title>Controle de Empadões</title>
   <style>
     body {font-family: Arial; background: linear-gradient(135deg,#4b0082,#8a2be2); color:#fff; text-align:center; padding:20px;}
-    .container {display:grid; grid-template-columns:repeat(4,1fr); gap:15px; max-width:1200px; margin:auto;}
-    .card {background:rgba(255,255,255,0.1); padding:15px; border-radius:15px;}
-    input {margin:4px; padding:6px; border-radius:6px; border:none; text-align:center;}
-    button {margin:10px; padding:10px; border:none; border-radius:10px; cursor:pointer;}
+    .gaveta {max-width:1200px; margin:auto; text-align:left;}
+    .semana {background:rgba(255,255,255,0.1); margin:10px 0; border-radius:10px; overflow:hidden;}
+    .titulo {padding:15px; cursor:pointer; font-weight:bold; background:rgba(0,0,0,0.2);}
+    .conteudo {display:none; padding:10px;}
+    .container {display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+    .card {background:rgba(255,255,255,0.15); padding:10px; border-radius:10px;}
+    input {margin:3px; padding:5px; border-radius:5px; border:none; text-align:center;}
+    button {margin:5px; padding:8px; border:none; border-radius:8px; cursor:pointer;}
     table {margin:20px auto; background:#fff; color:#000;}
   </style>
 </head>
 <body>
 
 <h1>Controle de Empadões</h1>
-
-<select id="semanaSelect" onchange="trocarSemana()"></select>
 <button onclick="novaSemana()">+ Nova Semana</button>
+<button onclick="salvarFirebase()">Salvar Tudo</button>
 
-<div class="container" id="produtos"></div>
-
-<button onclick="addSabor()">+ Adicionar Sabor</button>
-<button onclick="salvarFirebase()">Salvar</button>
-<button onclick="gerarRelatorio()">Relatório</button>
+<div class="gaveta" id="gaveta"></div>
 
 <div id="relatorio"></div>
 
@@ -44,10 +43,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let semanas = {};
-let semanaAtual = "Semana 1";
-
-const container = document.getElementById("produtos");
-const select = document.getElementById("semanaSelect");
+const gaveta = document.getElementById("gaveta");
 
 async function carregar(){
   const snap = await getDoc(doc(db,"empadoes","dados"));
@@ -56,67 +52,82 @@ async function carregar(){
   } else {
     semanas = {"Semana 1":[]};
   }
-  atualizarSelect();
   render();
-}
-
-function atualizarSelect(){
-  select.innerHTML="";
-  Object.keys(semanas).forEach(s=>{
-    const opt=document.createElement("option");
-    opt.value=s;
-    opt.innerText=s;
-    select.appendChild(opt);
-  });
-  select.value = semanaAtual;
 }
 
 function render(){
-  container.innerHTML="";
-  const lista = semanas[semanaAtual];
+  gaveta.innerHTML="";
 
-  lista.forEach((item,i)=>{
-    const div=document.createElement("div");
-    div.className="card";
+  Object.keys(semanas).forEach((semana)=>{
+    const box = document.createElement("div");
+    box.className="semana";
 
-    div.innerHTML=`
-      <input value="${item.nome}" onchange="editar(${i},'nome',this.value)"><br>
-      P: <input type="number" value="${item.precoP}" onchange="editar(${i},'precoP',this.value)"><br>
-      G: <input type="number" value="${item.precoG}" onchange="editar(${i},'precoG',this.value)"><br>
-      QP: <input type="number" value="${item.qtdP}" onchange="editar(${i},'qtdP',this.value)"><br>
-      QG: <input type="number" value="${item.qtdG}" onchange="editar(${i},'qtdG',this.value)"><br>
-      <button onclick="remover(${i})">Excluir</button>
-    `;
+    const titulo = document.createElement("div");
+    titulo.className="titulo";
+    titulo.innerText = semana;
+    titulo.onclick = ()=>{
+      conteudo.style.display = conteudo.style.display === "none" ? "block" : "none";
+    };
 
-    container.appendChild(div);
+    const conteudo = document.createElement("div");
+    conteudo.className="conteudo";
+
+    const container = document.createElement("div");
+    container.className="container";
+
+    semanas[semana].forEach((item,i)=>{
+      const card = document.createElement("div");
+      card.className="card";
+
+      card.innerHTML = `
+        <input value="${item.nome}" onchange="editar('${semana}',${i},'nome',this.value)"><br>
+        P: <input type="number" value="${item.precoP}" onchange="editar('${semana}',${i},'precoP',this.value)"><br>
+        G: <input type="number" value="${item.precoG}" onchange="editar('${semana}',${i},'precoG',this.value)"><br>
+        QP: <input type="number" value="${item.qtdP}" onchange="editar('${semana}',${i},'qtdP',this.value)"><br>
+        QG: <input type="number" value="${item.qtdG}" onchange="editar('${semana}',${i},'qtdG',this.value)"><br>
+        <button onclick="remover('${semana}',${i})">Excluir</button>
+      `;
+
+      container.appendChild(card);
+    });
+
+    const btnAdd = document.createElement("button");
+    btnAdd.innerText = "+ Sabor";
+    btnAdd.onclick = ()=>addSabor(semana);
+
+    const btnRel = document.createElement("button");
+    btnRel.innerText = "Relatório";
+    btnRel.onclick = ()=>gerarRelatorio(semana);
+
+    conteudo.appendChild(container);
+    conteudo.appendChild(btnAdd);
+    conteudo.appendChild(btnRel);
+
+    box.appendChild(titulo);
+    box.appendChild(conteudo);
+
+    gaveta.appendChild(box);
   });
 }
 
-window.editar=(i,campo,valor)=>{
-  const item = semanas[semanaAtual][i];
+window.editar=(semana,i,campo,valor)=>{
+  const item = semanas[semana][i];
   item[campo]= campo==='nome'?valor:parseFloat(valor)||0;
 }
 
-window.addSabor=()=>{
-  semanas[semanaAtual].push({nome:"Novo",precoP:0,precoG:0,qtdP:0,qtdG:0});
+window.addSabor=(semana)=>{
+  semanas[semana].push({nome:"Novo",precoP:0,precoG:0,qtdP:0,qtdG:0});
   render();
 }
 
-window.remover=(i)=>{
-  semanas[semanaAtual].splice(i,1);
+window.remover=(semana,i)=>{
+  semanas[semana].splice(i,1);
   render();
 }
 
 window.novaSemana=()=>{
   const nome = "Semana " + (Object.keys(semanas).length+1);
   semanas[nome]=[];
-  semanaAtual=nome;
-  atualizarSelect();
-  render();
-}
-
-window.trocarSemana=()=>{
-  semanaAtual = select.value;
   render();
 }
 
@@ -125,152 +136,9 @@ window.salvarFirebase=async()=>{
   alert("Salvo!");
 }
 
-window.gerarRelatorio=()=>{
-  let html="<h2>Relatório</h2><table border='1'><tr><th>Sabor</th><th>P</th><th>G</th><th>Total</th></tr>";
-  semanas[semanaAtual].forEach(item=>{
-    const total=(item.qtdP*item.precoP)+(item.qtdG*item.precoG);
-    if(total>0){
-      html+=`<tr><td>${item.nome}</td><td>${item.qtdP}</td><td>${item.qtdG}</td><td>${total.toFixed(2)}</td></tr>`;
-    }
-  });
-  html+="</table>";
-  document.getElementById("relatorio").innerHTML=html;
-}
-
-carregar();
-</script>
-
-</body>
-</html><!DOCTYPE html>
-<html lang="pt-br">
-<head>
-  <meta charset="UTF-8">
-  <title>Controle de Empadões</title>
-  <style>
-    body {font-family: Arial; background: linear-gradient(135deg,#4b0082,#8a2be2); color:#fff; text-align:center; padding:20px;}
-    .container {display:grid; grid-template-columns:repeat(4,1fr); gap:15px; max-width:1200px; margin:auto;}
-    .card {background:rgba(255,255,255,0.1); padding:15px; border-radius:15px;}
-    input {margin:4px; padding:6px; border-radius:6px; border:none; text-align:center;}
-    button {margin:10px; padding:10px; border:none; border-radius:10px; cursor:pointer;}
-    table {margin:20px auto; background:#fff; color:#000;}
-  </style>
-</head>
-<body>
-
-<h1>Controle de Empadões</h1>
-
-<select id="semanaSelect" onchange="trocarSemana()"></select>
-<button onclick="novaSemana()">+ Nova Semana</button>
-
-<div class="container" id="produtos"></div>
-
-<button onclick="addSabor()">+ Adicionar Sabor</button>
-<button onclick="salvarFirebase()">Salvar</button>
-<button onclick="gerarRelatorio()">Relatório</button>
-
-<div id="relatorio"></div>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBWqOEuOoucdlGi-J8OkJbNQlb2--YW6XU",
-  authDomain: "contagempad.firebaseapp.com",
-  projectId: "contagempad",
-  storageBucket: "contagempad.firebasestorage.app",
-  messagingSenderId: "414035527250",
-  appId: "1:414035527250:web:9694668e3ad95e745fc18b"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-let semanas = {};
-let semanaAtual = "Semana 1";
-
-const container = document.getElementById("produtos");
-const select = document.getElementById("semanaSelect");
-
-async function carregar(){
-  const snap = await getDoc(doc(db,"empadoes","dados"));
-  if(snap.exists()){
-    semanas = snap.data().semanas;
-  } else {
-    semanas = {"Semana 1":[]};
-  }
-  atualizarSelect();
-  render();
-}
-
-function atualizarSelect(){
-  select.innerHTML="";
-  Object.keys(semanas).forEach(s=>{
-    const opt=document.createElement("option");
-    opt.value=s;
-    opt.innerText=s;
-    select.appendChild(opt);
-  });
-  select.value = semanaAtual;
-}
-
-function render(){
-  container.innerHTML="";
-  const lista = semanas[semanaAtual];
-
-  lista.forEach((item,i)=>{
-    const div=document.createElement("div");
-    div.className="card";
-
-    div.innerHTML=`
-      <input value="${item.nome}" onchange="editar(${i},'nome',this.value)"><br>
-      P: <input type="number" value="${item.precoP}" onchange="editar(${i},'precoP',this.value)"><br>
-      G: <input type="number" value="${item.precoG}" onchange="editar(${i},'precoG',this.value)"><br>
-      QP: <input type="number" value="${item.qtdP}" onchange="editar(${i},'qtdP',this.value)"><br>
-      QG: <input type="number" value="${item.qtdG}" onchange="editar(${i},'qtdG',this.value)"><br>
-      <button onclick="remover(${i})">Excluir</button>
-    `;
-
-    container.appendChild(div);
-  });
-}
-
-window.editar=(i,campo,valor)=>{
-  const item = semanas[semanaAtual][i];
-  item[campo]= campo==='nome'?valor:parseFloat(valor)||0;
-}
-
-window.addSabor=()=>{
-  semanas[semanaAtual].push({nome:"Novo",precoP:0,precoG:0,qtdP:0,qtdG:0});
-  render();
-}
-
-window.remover=(i)=>{
-  semanas[semanaAtual].splice(i,1);
-  render();
-}
-
-window.novaSemana=()=>{
-  const nome = "Semana " + (Object.keys(semanas).length+1);
-  semanas[nome]=[];
-  semanaAtual=nome;
-  atualizarSelect();
-  render();
-}
-
-window.trocarSemana=()=>{
-  semanaAtual = select.value;
-  render();
-}
-
-window.salvarFirebase=async()=>{
-  await setDoc(doc(db,"empadoes","dados"),{semanas});
-  alert("Salvo!");
-}
-
-window.gerarRelatorio=()=>{
-  let html="<h2>Relatório</h2><table border='1'><tr><th>Sabor</th><th>P</th><th>G</th><th>Total</th></tr>";
-  semanas[semanaAtual].forEach(item=>{
+window.gerarRelatorio=(semana)=>{
+  let html=`<h2>${semana}</h2><table border='1'><tr><th>Sabor</th><th>P</th><th>G</th><th>Total</th></tr>`;
+  semanas[semana].forEach(item=>{
     const total=(item.qtdP*item.precoP)+(item.qtdG*item.precoG);
     if(total>0){
       html+=`<tr><td>${item.nome}</td><td>${item.qtdP}</td><td>${item.qtdG}</td><td>${total.toFixed(2)}</td></tr>`;
