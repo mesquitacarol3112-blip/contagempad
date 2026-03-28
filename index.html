@@ -5,22 +5,72 @@
   <title>Controle de Empadões</title>
   <style>
     body {font-family: Arial; background: linear-gradient(135deg,#4b0082,#8a2be2); color:#fff; text-align:center; padding:20px;}
-    .gaveta {max-width:1200px; margin:auto; text-align:left;}
-    .semana {background:rgba(255,255,255,0.1); margin:10px 0; border-radius:10px; overflow:hidden;}
-    .titulo {padding:15px; cursor:pointer; font-weight:bold; background:rgba(0,0,0,0.2);}
-    .conteudo {display:none; padding:10px;}
-    .container {display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
-    .card {background:rgba(255,255,255,0.15); padding:10px; border-radius:10px;}
-    input {margin:3px; padding:5px; border-radius:5px; border:none; text-align:center;}
-    button {margin:5px; padding:8px; border:none; border-radius:8px; cursor:pointer;}
-    table {margin:20px auto; background:#fff; color:#000;}
+
+    h1 {margin-bottom:20px;}
+
+    .top-buttons {margin-bottom:20px;}
+
+    .gaveta {max-width:1100px; margin:auto; text-align:left;}
+
+    .semana {background:rgba(255,255,255,0.1); margin:10px 0; border-radius:12px; overflow:hidden;}
+
+    .titulo {
+      padding:15px;
+      cursor:pointer;
+      font-weight:bold;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      background:rgba(0,0,0,0.25);
+    }
+
+    .conteudo {display:none; padding:15px;}
+
+    .container {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+      gap:10px;
+    }
+
+    .card {
+      background:rgba(255,255,255,0.15);
+      padding:10px;
+      border-radius:10px;
+      text-align:center;
+    }
+
+    input {
+      margin:3px;
+      padding:5px;
+      border-radius:5px;
+      border:none;
+      text-align:center;
+      width:80%;
+    }
+
+    button {
+      margin:5px;
+      padding:8px 12px;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+      font-weight:bold;
+    }
+
+    .danger {background:#ff4d4d; color:#fff;}
+
+    table {margin:20px auto; background:#fff; color:#000; border-radius:8px; overflow:hidden;}
+    th,td {padding:10px;}
   </style>
 </head>
 <body>
 
 <h1>Controle de Empadões</h1>
-<button onclick="novaSemana()">+ Nova Semana</button>
-<button onclick="salvarFirebase()">Salvar Tudo</button>
+
+<div class="top-buttons">
+  <button onclick="novaSemana()">+ Nova Semana</button>
+  <button onclick="salvarFirebase()">Salvar Tudo</button>
+</div>
 
 <div class="gaveta" id="gaveta"></div>
 
@@ -47,11 +97,13 @@ const gaveta = document.getElementById("gaveta");
 
 async function carregar(){
   const snap = await getDoc(doc(db,"empadoes","dados"));
-  if(snap.exists()){
+
+  if(snap.exists() && snap.data().semanas){
     semanas = snap.data().semanas;
   } else {
     semanas = {"Semana 1":[]};
   }
+
   render();
 }
 
@@ -59,18 +111,33 @@ function render(){
   gaveta.innerHTML="";
 
   Object.keys(semanas).forEach((semana)=>{
+
     const box = document.createElement("div");
     box.className="semana";
 
     const titulo = document.createElement("div");
     titulo.className="titulo";
-    titulo.innerText = semana;
-    titulo.onclick = ()=>{
-      conteudo.style.display = conteudo.style.display === "none" ? "block" : "none";
+
+    const nomeSpan = document.createElement("span");
+    nomeSpan.innerText = semana;
+
+    const btnDeleteSemana = document.createElement("button");
+    btnDeleteSemana.innerText = "Excluir Semana";
+    btnDeleteSemana.className = "danger";
+    btnDeleteSemana.onclick = (e)=>{
+      e.stopPropagation();
+      deletarSemana(semana);
     };
+
+    titulo.appendChild(nomeSpan);
+    titulo.appendChild(btnDeleteSemana);
 
     const conteudo = document.createElement("div");
     conteudo.className="conteudo";
+
+    titulo.onclick = ()=>{
+      conteudo.style.display = conteudo.style.display === "block" ? "none" : "block";
+    };
 
     const container = document.createElement("div");
     container.className="container";
@@ -80,12 +147,12 @@ function render(){
       card.className="card";
 
       card.innerHTML = `
-        <input value="${item.nome}" onchange="editar('${semana}',${i},'nome',this.value)"><br>
-        P: <input type="number" value="${item.precoP}" onchange="editar('${semana}',${i},'precoP',this.value)"><br>
-        G: <input type="number" value="${item.precoG}" onchange="editar('${semana}',${i},'precoG',this.value)"><br>
-        QP: <input type="number" value="${item.qtdP}" onchange="editar('${semana}',${i},'qtdP',this.value)"><br>
-        QG: <input type="number" value="${item.qtdG}" onchange="editar('${semana}',${i},'qtdG',this.value)"><br>
-        <button onclick="remover('${semana}',${i})">Excluir</button>
+        <input placeholder="Nome" value="${item.nome || ''}" onchange="editar('${semana}',${i},'nome',this.value)"><br>
+        P: <input type="number" value="${item.precoP || 0}" onchange="editar('${semana}',${i},'precoP',this.value)"><br>
+        G: <input type="number" value="${item.precoG || 0}" onchange="editar('${semana}',${i},'precoG',this.value)"><br>
+        QP: <input type="number" value="${item.qtdP || 0}" onchange="editar('${semana}',${i},'qtdP',this.value)"><br>
+        QG: <input type="number" value="${item.qtdG || 0}" onchange="editar('${semana}',${i},'qtdG',this.value)"><br>
+        <button class="danger" onclick="remover('${semana}',${i})">Excluir</button>
       `;
 
       container.appendChild(card);
@@ -116,12 +183,20 @@ window.editar=(semana,i,campo,valor)=>{
 }
 
 window.addSabor=(semana)=>{
-  semanas[semana].push({nome:"Novo",precoP:0,precoG:0,qtdP:0,qtdG:0});
+  semanas[semana].push({nome:"",precoP:0,precoG:0,qtdP:0,qtdG:0});
   render();
 }
 
 window.remover=(semana,i)=>{
   semanas[semana].splice(i,1);
+  render();
+}
+
+window.deletarSemana=(semana)=>{
+  delete semanas[semana];
+  if(Object.keys(semanas).length === 0){
+    semanas = {"Semana 1":[]};
+  }
   render();
 }
 
@@ -138,12 +213,14 @@ window.salvarFirebase=async()=>{
 
 window.gerarRelatorio=(semana)=>{
   let html=`<h2>${semana}</h2><table border='1'><tr><th>Sabor</th><th>P</th><th>G</th><th>Total</th></tr>`;
+
   semanas[semana].forEach(item=>{
     const total=(item.qtdP*item.precoP)+(item.qtdG*item.precoG);
     if(total>0){
       html+=`<tr><td>${item.nome}</td><td>${item.qtdP}</td><td>${item.qtdG}</td><td>${total.toFixed(2)}</td></tr>`;
     }
   });
+
   html+="</table>";
   document.getElementById("relatorio").innerHTML=html;
 }
