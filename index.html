@@ -2,130 +2,285 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Controle Semanal de Empadões</title>
+  <title>Controle de Empadões</title>
   <style>
-    body {font-family: Arial, sans-serif; background: linear-gradient(135deg,#4b0082,#8a2be2); color:#fff; text-align:center; padding:20px;}
-    h1 {margin-bottom:20px;}
+    body {font-family: Arial; background: linear-gradient(135deg,#4b0082,#8a2be2); color:#fff; text-align:center; padding:20px;}
     .container {display:grid; grid-template-columns:repeat(4,1fr); gap:15px; max-width:1200px; margin:auto;}
-    .card {background:rgba(255,255,255,0.1); padding:15px; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.3);}    
-    input, select {padding:6px; border-radius:6px; border:none; text-align:center; margin:4px;}
-    .nome {width:120px;}
-    .preco {width:80px;}
-    .qtd {width:60px;}
-    .total {margin-top:30px; font-size:20px;}
-    button {margin:10px; padding:10px 20px; border:none; border-radius:10px; background:#fff; color:#4b0082; font-weight:bold; cursor:pointer;}
-    table {margin:20px auto; background:#fff; color:#000; border-radius:10px; overflow:hidden;}
-    th,td {padding:10px 15px;}
+    .card {background:rgba(255,255,255,0.1); padding:15px; border-radius:15px;}
+    input {margin:4px; padding:6px; border-radius:6px; border:none; text-align:center;}
+    button {margin:10px; padding:10px; border:none; border-radius:10px; cursor:pointer;}
+    table {margin:20px auto; background:#fff; color:#000;}
   </style>
 </head>
 <body>
 
-<h1>Controle Semanal de Empadões</h1>
+<h1>Controle de Empadões</h1>
+
+<select id="semanaSelect" onchange="trocarSemana()"></select>
+<button onclick="novaSemana()">+ Nova Semana</button>
 
 <div class="container" id="produtos"></div>
 
-<div class="total">
-  Total de unidades: <span id="totalQtd">0</span><br>
-  Total em R$: <span id="totalValor">0.00</span>
-</div>
-
-<button onclick="salvarFirebase()">Salvar na Nuvem</button>
-<button onclick="gerarRelatorio()">Gerar Relatório</button>
-<button onclick="resetar()">Resetar</button>
+<button onclick="addSabor()">+ Adicionar Sabor</button>
+<button onclick="salvarFirebase()">Salvar</button>
+<button onclick="gerarRelatorio()">Relatório</button>
 
 <div id="relatorio"></div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyBWqOEuOoucdlGi-J8OkJbNQlb2--YW6XU",
-    authDomain: "contagempad.firebaseapp.com",
-    projectId: "contagempad",
-    storageBucket: "contagempad.firebasestorage.app",
-    messagingSenderId: "414035527250",
-    appId: "1:414035527250:web:9694668e3ad95e745fc18b"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyBWqOEuOoucdlGi-J8OkJbNQlb2--YW6XU",
+  authDomain: "contagempad.firebaseapp.com",
+  projectId: "contagempad",
+  storageBucket: "contagempad.firebasestorage.app",
+  messagingSenderId: "414035527250",
+  appId: "1:414035527250:web:9694668e3ad95e745fc18b"
+};
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  const defaultLista = Array.from({length:24}, (_,i)=>({nome:`Sabor ${i+1}`, precoP:10, precoG:15, qtdP:0, qtdG:0}));
-  let lista = [];
+let semanas = {};
+let semanaAtual = "Semana 1";
 
-  const container = document.getElementById("produtos");
+const container = document.getElementById("produtos");
+const select = document.getElementById("semanaSelect");
 
-  async function carregarFirebase(){
-    const docRef = doc(db, "empadoes", "semana");
-    const docSnap = await getDoc(docRef);
+async function carregar(){
+  const snap = await getDoc(doc(db,"empadoes","dados"));
+  if(snap.exists()){
+    semanas = snap.data().semanas;
+  } else {
+    semanas = {"Semana 1":[]};
+  }
+  atualizarSelect();
+  render();
+}
 
-    if(docSnap.exists()){
-      lista = docSnap.data().lista;
-    } else {
-      lista = defaultLista;
+function atualizarSelect(){
+  select.innerHTML="";
+  Object.keys(semanas).forEach(s=>{
+    const opt=document.createElement("option");
+    opt.value=s;
+    opt.innerText=s;
+    select.appendChild(opt);
+  });
+  select.value = semanaAtual;
+}
+
+function render(){
+  container.innerHTML="";
+  const lista = semanas[semanaAtual];
+
+  lista.forEach((item,i)=>{
+    const div=document.createElement("div");
+    div.className="card";
+
+    div.innerHTML=`
+      <input value="${item.nome}" onchange="editar(${i},'nome',this.value)"><br>
+      P: <input type="number" value="${item.precoP}" onchange="editar(${i},'precoP',this.value)"><br>
+      G: <input type="number" value="${item.precoG}" onchange="editar(${i},'precoG',this.value)"><br>
+      QP: <input type="number" value="${item.qtdP}" onchange="editar(${i},'qtdP',this.value)"><br>
+      QG: <input type="number" value="${item.qtdG}" onchange="editar(${i},'qtdG',this.value)"><br>
+      <button onclick="remover(${i})">Excluir</button>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+window.editar=(i,campo,valor)=>{
+  const item = semanas[semanaAtual][i];
+  item[campo]= campo==='nome'?valor:parseFloat(valor)||0;
+}
+
+window.addSabor=()=>{
+  semanas[semanaAtual].push({nome:"Novo",precoP:0,precoG:0,qtdP:0,qtdG:0});
+  render();
+}
+
+window.remover=(i)=>{
+  semanas[semanaAtual].splice(i,1);
+  render();
+}
+
+window.novaSemana=()=>{
+  const nome = "Semana " + (Object.keys(semanas).length+1);
+  semanas[nome]=[];
+  semanaAtual=nome;
+  atualizarSelect();
+  render();
+}
+
+window.trocarSemana=()=>{
+  semanaAtual = select.value;
+  render();
+}
+
+window.salvarFirebase=async()=>{
+  await setDoc(doc(db,"empadoes","dados"),{semanas});
+  alert("Salvo!");
+}
+
+window.gerarRelatorio=()=>{
+  let html="<h2>Relatório</h2><table border='1'><tr><th>Sabor</th><th>P</th><th>G</th><th>Total</th></tr>";
+  semanas[semanaAtual].forEach(item=>{
+    const total=(item.qtdP*item.precoP)+(item.qtdG*item.precoG);
+    if(total>0){
+      html+=`<tr><td>${item.nome}</td><td>${item.qtdP}</td><td>${item.qtdG}</td><td>${total.toFixed(2)}</td></tr>`;
     }
-    render();
+  });
+  html+="</table>";
+  document.getElementById("relatorio").innerHTML=html;
+}
+
+carregar();
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Controle de Empadões</title>
+  <style>
+    body {font-family: Arial; background: linear-gradient(135deg,#4b0082,#8a2be2); color:#fff; text-align:center; padding:20px;}
+    .container {display:grid; grid-template-columns:repeat(4,1fr); gap:15px; max-width:1200px; margin:auto;}
+    .card {background:rgba(255,255,255,0.1); padding:15px; border-radius:15px;}
+    input {margin:4px; padding:6px; border-radius:6px; border:none; text-align:center;}
+    button {margin:10px; padding:10px; border:none; border-radius:10px; cursor:pointer;}
+    table {margin:20px auto; background:#fff; color:#000;}
+  </style>
+</head>
+<body>
+
+<h1>Controle de Empadões</h1>
+
+<select id="semanaSelect" onchange="trocarSemana()"></select>
+<button onclick="novaSemana()">+ Nova Semana</button>
+
+<div class="container" id="produtos"></div>
+
+<button onclick="addSabor()">+ Adicionar Sabor</button>
+<button onclick="salvarFirebase()">Salvar</button>
+<button onclick="gerarRelatorio()">Relatório</button>
+
+<div id="relatorio"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBWqOEuOoucdlGi-J8OkJbNQlb2--YW6XU",
+  authDomain: "contagempad.firebaseapp.com",
+  projectId: "contagempad",
+  storageBucket: "contagempad.firebasestorage.app",
+  messagingSenderId: "414035527250",
+  appId: "1:414035527250:web:9694668e3ad95e745fc18b"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let semanas = {};
+let semanaAtual = "Semana 1";
+
+const container = document.getElementById("produtos");
+const select = document.getElementById("semanaSelect");
+
+async function carregar(){
+  const snap = await getDoc(doc(db,"empadoes","dados"));
+  if(snap.exists()){
+    semanas = snap.data().semanas;
+  } else {
+    semanas = {"Semana 1":[]};
   }
+  atualizarSelect();
+  render();
+}
 
-  function render(){
-    container.innerHTML = "";
-    lista.forEach((item,index)=>{
-      const div = document.createElement("div");
-      div.className = "card";
+function atualizarSelect(){
+  select.innerHTML="";
+  Object.keys(semanas).forEach(s=>{
+    const opt=document.createElement("option");
+    opt.value=s;
+    opt.innerText=s;
+    select.appendChild(opt);
+  });
+  select.value = semanaAtual;
+}
 
-      div.innerHTML = `
-        <input class="nome" value="${item.nome}" onchange="editar(${index},'nome',this.value)"><br>
-        P: R$ <input class="preco" type="number" value="${item.precoP}" onchange="editar(${index},'precoP',this.value)"><br>
-        G: R$ <input class="preco" type="number" value="${item.precoG}" onchange="editar(${index},'precoG',this.value)"><br>
-        Qtd P: <input class="qtd" type="number" value="${item.qtdP}" onchange="editar(${index},'qtdP',this.value)"><br>
-        Qtd G: <input class="qtd" type="number" value="${item.qtdG}" onchange="editar(${index},'qtdG',this.value)">
-      `;
+function render(){
+  container.innerHTML="";
+  const lista = semanas[semanaAtual];
 
-      container.appendChild(div);
-    });
-    calcular();
-  }
+  lista.forEach((item,i)=>{
+    const div=document.createElement("div");
+    div.className="card";
 
-  window.editar = function(index,campo,valor){
-    lista[index][campo] = campo==='nome'? valor : parseFloat(valor)||0;
-    calcular();
-  }
+    div.innerHTML=`
+      <input value="${item.nome}" onchange="editar(${i},'nome',this.value)"><br>
+      P: <input type="number" value="${item.precoP}" onchange="editar(${i},'precoP',this.value)"><br>
+      G: <input type="number" value="${item.precoG}" onchange="editar(${i},'precoG',this.value)"><br>
+      QP: <input type="number" value="${item.qtdP}" onchange="editar(${i},'qtdP',this.value)"><br>
+      QG: <input type="number" value="${item.qtdG}" onchange="editar(${i},'qtdG',this.value)"><br>
+      <button onclick="remover(${i})">Excluir</button>
+    `;
 
-  function calcular(){
-    let totalQtd=0, totalValor=0;
-    lista.forEach(item=>{
-      totalQtd += item.qtdP + item.qtdG;
-      totalValor += (item.qtdP * item.precoP) + (item.qtdG * item.precoG);
-    });
-    document.getElementById("totalQtd").innerText = totalQtd;
-    document.getElementById("totalValor").innerText = totalValor.toFixed(2);
-  }
+    container.appendChild(div);
+  });
+}
 
-  window.salvarFirebase = async function(){
-    await setDoc(doc(db, "empadoes", "semana"), { lista });
-    alert("Salvo na nuvem com sucesso!");
-  }
+window.editar=(i,campo,valor)=>{
+  const item = semanas[semanaAtual][i];
+  item[campo]= campo==='nome'?valor:parseFloat(valor)||0;
+}
 
-  window.resetar = function(){
-    lista.forEach(item=>{item.qtdP=0; item.qtdG=0});
-    render();
-    document.getElementById("relatorio").innerHTML="";
-  }
+window.addSabor=()=>{
+  semanas[semanaAtual].push({nome:"Novo",precoP:0,precoG:0,qtdP:0,qtdG:0});
+  render();
+}
 
-  window.gerarRelatorio = function(){
-    let html = "<h2>Relatório da Semana</h2><table><tr><th>Sabor</th><th>P</th><th>G</th><th>Total R$</th></tr>";
-    lista.forEach(item=>{
-      if(item.qtdP>0 || item.qtdG>0){
-        const total = (item.qtdP * item.precoP) + (item.qtdG * item.precoG);
-        html += `<tr><td>${item.nome}</td><td>${item.qtdP}</td><td>${item.qtdG}</td><td>${total.toFixed(2)}</td></tr>`;
-      }
-    });
-    html += "</table>";
-    document.getElementById("relatorio").innerHTML = html;
-  }
+window.remover=(i)=>{
+  semanas[semanaAtual].splice(i,1);
+  render();
+}
 
-  carregarFirebase();
+window.novaSemana=()=>{
+  const nome = "Semana " + (Object.keys(semanas).length+1);
+  semanas[nome]=[];
+  semanaAtual=nome;
+  atualizarSelect();
+  render();
+}
+
+window.trocarSemana=()=>{
+  semanaAtual = select.value;
+  render();
+}
+
+window.salvarFirebase=async()=>{
+  await setDoc(doc(db,"empadoes","dados"),{semanas});
+  alert("Salvo!");
+}
+
+window.gerarRelatorio=()=>{
+  let html="<h2>Relatório</h2><table border='1'><tr><th>Sabor</th><th>P</th><th>G</th><th>Total</th></tr>";
+  semanas[semanaAtual].forEach(item=>{
+    const total=(item.qtdP*item.precoP)+(item.qtdG*item.precoG);
+    if(total>0){
+      html+=`<tr><td>${item.nome}</td><td>${item.qtdP}</td><td>${item.qtdG}</td><td>${total.toFixed(2)}</td></tr>`;
+    }
+  });
+  html+="</table>";
+  document.getElementById("relatorio").innerHTML=html;
+}
+
+carregar();
 </script>
 
 </body>
