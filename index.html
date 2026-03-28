@@ -6,9 +6,9 @@
   <style>
     body {font-family: Arial, sans-serif; background: linear-gradient(135deg,#4b0082,#8a2be2); color:#fff; text-align:center; padding:20px;}
     h1 {margin-bottom:20px;}
-    .container {display:grid; grid-template-columns:repeat(3,1fr); gap:15px; max-width:1000px; margin:auto;}
+    .container {display:grid; grid-template-columns:repeat(4,1fr); gap:15px; max-width:1200px; margin:auto;}
     .card {background:rgba(255,255,255,0.1); padding:15px; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.3);}    
-    input {padding:6px; border-radius:6px; border:none; text-align:center; margin:4px;}
+    input, select {padding:6px; border-radius:6px; border:none; text-align:center; margin:4px;}
     .nome {width:120px;}
     .preco {width:80px;}
     .qtd {width:60px;}
@@ -29,17 +29,44 @@
   Total em R$: <span id="totalValor">0.00</span>
 </div>
 
-<button onclick="salvar()">Salvar Semana</button>
+<button onclick="salvarFirebase()">Salvar na Nuvem</button>
 <button onclick="gerarRelatorio()">Gerar Relatório</button>
 <button onclick="resetar()">Resetar</button>
 
 <div id="relatorio"></div>
 
-<script>
-  const defaultLista = Array.from({length:12}, (_,i)=>({nome:`Sabor ${i+1}`, preco:10, qtd:0}));
-  let lista = JSON.parse(localStorage.getItem("empadoes")) || defaultLista;
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBWqOEuOoucdlGi-J8OkJbNQlb2--YW6XU",
+    authDomain: "contagempad.firebaseapp.com",
+    projectId: "contagempad",
+    storageBucket: "contagempad.firebasestorage.app",
+    messagingSenderId: "414035527250",
+    appId: "1:414035527250:web:9694668e3ad95e745fc18b"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const defaultLista = Array.from({length:24}, (_,i)=>({nome:`Sabor ${i+1}`, precoP:10, precoG:15, qtdP:0, qtdG:0}));
+  let lista = [];
 
   const container = document.getElementById("produtos");
+
+  async function carregarFirebase(){
+    const docRef = doc(db, "empadoes", "semana");
+    const docSnap = await getDoc(docRef);
+
+    if(docSnap.exists()){
+      lista = docSnap.data().lista;
+    } else {
+      lista = defaultLista;
+    }
+    render();
+  }
 
   function render(){
     container.innerHTML = "";
@@ -49,8 +76,10 @@
 
       div.innerHTML = `
         <input class="nome" value="${item.nome}" onchange="editar(${index},'nome',this.value)"><br>
-        R$ <input class="preco" type="number" step="0.01" value="${item.preco}" onchange="editar(${index},'preco',this.value)"><br>
-        <input class="qtd" type="number" min="0" value="${item.qtd}" onchange="editar(${index},'qtd',this.value)">
+        P: R$ <input class="preco" type="number" value="${item.precoP}" onchange="editar(${index},'precoP',this.value)"><br>
+        G: R$ <input class="preco" type="number" value="${item.precoG}" onchange="editar(${index},'precoG',this.value)"><br>
+        Qtd P: <input class="qtd" type="number" value="${item.qtdP}" onchange="editar(${index},'qtdP',this.value)"><br>
+        Qtd G: <input class="qtd" type="number" value="${item.qtdG}" onchange="editar(${index},'qtdG',this.value)">
       `;
 
       container.appendChild(div);
@@ -58,45 +87,45 @@
     calcular();
   }
 
-  function editar(index,campo,valor){
+  window.editar = function(index,campo,valor){
     lista[index][campo] = campo==='nome'? valor : parseFloat(valor)||0;
-    salvar();
     calcular();
   }
 
   function calcular(){
     let totalQtd=0, totalValor=0;
     lista.forEach(item=>{
-      totalQtd += item.qtd;
-      totalValor += item.qtd * item.preco;
+      totalQtd += item.qtdP + item.qtdG;
+      totalValor += (item.qtdP * item.precoP) + (item.qtdG * item.precoG);
     });
     document.getElementById("totalQtd").innerText = totalQtd;
     document.getElementById("totalValor").innerText = totalValor.toFixed(2);
   }
 
-  function salvar(){
-    localStorage.setItem("empadoes", JSON.stringify(lista));
+  window.salvarFirebase = async function(){
+    await setDoc(doc(db, "empadoes", "semana"), { lista });
+    alert("Salvo na nuvem com sucesso!");
   }
 
-  function resetar(){
-    lista.forEach(item=>item.qtd=0);
-    salvar();
+  window.resetar = function(){
+    lista.forEach(item=>{item.qtdP=0; item.qtdG=0});
     render();
     document.getElementById("relatorio").innerHTML="";
   }
 
-  function gerarRelatorio(){
-    let html = "<h2>Relatório da Semana</h2><table><tr><th>Sabor</th><th>Qtd</th><th>R$</th></tr>";
+  window.gerarRelatorio = function(){
+    let html = "<h2>Relatório da Semana</h2><table><tr><th>Sabor</th><th>P</th><th>G</th><th>Total R$</th></tr>";
     lista.forEach(item=>{
-      if(item.qtd>0){
-        html += `<tr><td>${item.nome}</td><td>${item.qtd}</td><td>${(item.qtd*item.preco).toFixed(2)}</td></tr>`;
+      if(item.qtdP>0 || item.qtdG>0){
+        const total = (item.qtdP * item.precoP) + (item.qtdG * item.precoG);
+        html += `<tr><td>${item.nome}</td><td>${item.qtdP}</td><td>${item.qtdG}</td><td>${total.toFixed(2)}</td></tr>`;
       }
     });
     html += "</table>";
     document.getElementById("relatorio").innerHTML = html;
   }
 
-  render();
+  carregarFirebase();
 </script>
 
 </body>
