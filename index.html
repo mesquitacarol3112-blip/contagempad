@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Controle Semanal de Empadões</title>
+  <style>
+    body {font-family: Arial, sans-serif; background: linear-gradient(135deg,#4b0082,#8a2be2); color:#fff; text-align:center; padding:20px;}
+    h1 {margin-bottom:20px;}
+    .container {display:grid; grid-template-columns:repeat(3,1fr); gap:15px; max-width:1000px; margin:auto;}
+    .card {background:rgba(255,255,255,0.1); padding:15px; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.3);}    
+    input {padding:6px; border-radius:6px; border:none; text-align:center; margin:4px;}
+    .nome {width:120px;}
+    .preco {width:80px;}
+    .qtd {width:60px;}
+    .total {margin-top:30px; font-size:20px;}
+    button {margin:10px; padding:10px 20px; border:none; border-radius:10px; background:#fff; color:#4b0082; font-weight:bold; cursor:pointer;}
+    table {margin:20px auto; background:#fff; color:#000; border-radius:10px; overflow:hidden;}
+    th,td {padding:10px 15px;}
+  </style>
+</head>
+<body>
+
+<h1>Controle Semanal de Empadões</h1>
+
+<div class="container" id="produtos"></div>
+
+<div class="total">
+  Total de unidades: <span id="totalQtd">0</span><br>
+  Total em R$: <span id="totalValor">0.00</span>
+</div>
+
+<button onclick="salvar()">Salvar Semana</button>
+<button onclick="gerarRelatorio()">Gerar Relatório</button>
+<button onclick="resetar()">Resetar</button>
+
+<div id="relatorio"></div>
+
+<script>
+  const defaultLista = Array.from({length:12}, (_,i)=>({nome:`Sabor ${i+1}`, preco:10, qtd:0}));
+  let lista = JSON.parse(localStorage.getItem("empadoes")) || defaultLista;
+
+  const container = document.getElementById("produtos");
+
+  function render(){
+    container.innerHTML = "";
+    lista.forEach((item,index)=>{
+      const div = document.createElement("div");
+      div.className = "card";
+
+      div.innerHTML = `
+        <input class="nome" value="${item.nome}" onchange="editar(${index},'nome',this.value)"><br>
+        R$ <input class="preco" type="number" step="0.01" value="${item.preco}" onchange="editar(${index},'preco',this.value)"><br>
+        <input class="qtd" type="number" min="0" value="${item.qtd}" onchange="editar(${index},'qtd',this.value)">
+      `;
+
+      container.appendChild(div);
+    });
+    calcular();
+  }
+
+  function editar(index,campo,valor){
+    lista[index][campo] = campo==='nome'? valor : parseFloat(valor)||0;
+    salvar();
+    calcular();
+  }
+
+  function calcular(){
+    let totalQtd=0, totalValor=0;
+    lista.forEach(item=>{
+      totalQtd += item.qtd;
+      totalValor += item.qtd * item.preco;
+    });
+    document.getElementById("totalQtd").innerText = totalQtd;
+    document.getElementById("totalValor").innerText = totalValor.toFixed(2);
+  }
+
+  function salvar(){
+    localStorage.setItem("empadoes", JSON.stringify(lista));
+  }
+
+  function resetar(){
+    lista.forEach(item=>item.qtd=0);
+    salvar();
+    render();
+    document.getElementById("relatorio").innerHTML="";
+  }
+
+  function gerarRelatorio(){
+    let html = "<h2>Relatório da Semana</h2><table><tr><th>Sabor</th><th>Qtd</th><th>R$</th></tr>";
+    lista.forEach(item=>{
+      if(item.qtd>0){
+        html += `<tr><td>${item.nome}</td><td>${item.qtd}</td><td>${(item.qtd*item.preco).toFixed(2)}</td></tr>`;
+      }
+    });
+    html += "</table>";
+    document.getElementById("relatorio").innerHTML = html;
+  }
+
+  render();
+</script>
+
+</body>
+</html>
